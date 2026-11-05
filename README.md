@@ -1,57 +1,32 @@
-# Watch Together — MVP
+# Watch Together — Cloudflare backend
 
-Chrome 116+ ve güncel Edge için Manifest V3 eklentisi. Her kullanıcı aynı videoyu kendi bağlantısıyla açar. Relay yalnız oynatma durumu ve görünüm olaylarını taşır; video, stream, sayfa adresi veya video adresi göndermez. İki bilgisayarın aynı ağda olması gerekmez.
+Render yerine kart gerektirmeyen Workers Free planı için hazırlanmıştır. Cloudflare hesabı gerekir; domain satın almak veya kredi kartı eklemek gerekmez. Birlikte izleyecek kişinin hosting hesabına ihtiyacı yoktur. Free plan kotası aşılırsa hizmet hata verebilir; ücretli plana geçmeyin.
 
-**Durum:** Kod ve deployment yapılandırması hazır. Public servis henüz deploy edilmedi; gerçek bir WSS adresi girilmeden internet üzerinden oda kurulamaz.
+## Mevcut GitHub repository'sine ekle
 
-## 1. Public relay — bir kez
+ZIP'i çıkarın ve **cloudflare klasörünü** mevcut `AshMosbius/watch-together` repository'sinin ana ekranına Add file → Upload files ile yükleyin. Klasörün kendisini sürükleyin; böylece ana ekranda backend/extension yanında cloudflare klasörü oluşur. Önceki dosyaları silmeyin.
 
-Seçilen servis: **Render Free Web Service**. Bir GitHub repository'sine bu klasörün içeriğini (`render.yaml` repository kökünde olacak şekilde) yükleyin. Render'da giriş yapın, **New → Blueprint**, repository'yi seçin ve ücretsiz `watch-together-relay` servisini oluşturun. Blueprint Node sürümünü, build/start komutlarını ve health check'i ayarlar. Alternatif deployment seçenekleri gerekmiyor.
+## Cloudflare kurulumu
 
-Servis hazır olduğunda `https://SERVIS.onrender.com/health` adresinde `ok` görünmelidir. Eklentinin Relay alanına iki bilgisayarda da `wss://SERVIS.onrender.com` yazın. TLS'yi Render sağlar; backend portunu internete kendiniz açmazsınız.
+1. https://dash.cloudflare.com üzerinden hesap açın/giriş yapın; gerekiyorsa e-postayı doğrulayın.
+2. Workers & Pages bölümünden Worker oluşturun; GitHub repository'sinden deploy yolunu seçin.
+3. Repository: `AshMosbius/watch-together`, branch: `main`.
+4. Worker/project name: **watch-together-relay** (wrangler.jsonc içindeki adla aynı olmalı).
+5. Root directory: **cloudflare**.
+6. Build command: **npm ci**. Deploy command: **npx wrangler deploy**.
+7. Free planda deploy edin. `wrangler.jsonc` Durable Object binding ve SQLite migration'ı tanımlar; bunları elle eklemeyin. Domain/Pages/static site/ücretli container kullanmayın.
 
-İstenirse dağıtmadan önce `python tools/set-endpoint.py wss://SERVIS.onrender.com` çalıştırın: adres eklentinin varsayılanı olur. `extension` klasörünü yeniden ZIP'leyin.
+Oluşan `https://watch-together-relay.HESABINIZ.workers.dev/health` adresi `ok` döndürmelidir. Eklentinin Relay alanına **wss://watch-together-relay.HESABINIZ.workers.dev** girin. HESABINIZ kısmı örnektir; gerçek adresi deployment ekranından alın. İki bilgisayarda aynı adresi kullanın. Mevcut extension değişmez; Create Room / Join Room ile devam edilir.
 
-Ücretsiz servis boşta 15 dakika sonra uyuyabilir; ilk bağlantı yaklaşık bir dakika sürebilir. Otomatik retry bunu bekler. Free tier kota/kesintileri olabilir; ödeme veya kimlik doğrulaması istenirse o aşamada hesap sahibi tamamlamalıdır. Kalıcı veri tabanı yok: servis restart/deploy olursa odalar kaybolur, yeni oda oluşturun.
+## Teknik
 
-Resmî kaynaklar: https://render.com/docs/free · https://render.com/docs/websocket
+Worker yalnız sync mesajlarını iletir: play, pause, seek, playbackRate, heartbeat, theater ve fullscreen bildirimi. Video/sayfa URL'si, medya ve stream kabul edilmez. Oda oluşturma/katılma/ayrılma ve bağlantı ping/pong mesajları da vardır.
 
-## 2. İki bilgisayara kurulum
+WebSocket Hibernation, 144 bit oda kodu, oda başına iki kullanıcı, 30 dakika inactivity, 2 KB payload ve bağlantı başına token bucket hız sınırı uygulanır. Oda üst sınırı 100, eşzamanlı socket üst sınırı 100'dür. Oda state'i hibernation sonrası geri alınabilmesi için Cloudflare storage'a yazılır; inactivity alarmı ile silinir (yaklaşık 30–35 dakika). Oda kodunu gizli tutun. Uygulama medya veya kodları loglamaz.
 
-1. ZIP'i normal bir klasöre çıkarın; klasörü sonra silmeyin/taşımayın.
-2. Chrome: `chrome://extensions` / Edge: `edge://extensions`.
-3. **Developer Mode → Load unpacked → extension** klasörünü seçin.
-4. Eklentiyi araç çubuğuna sabitleyin. Zaten açık olan video sayfasını yenileyin.
+Test için Node 22+: `npm ci` ardından `npm test`. Bu, Miniflare/workerd yerel Cloudflare runtime'ında iki bağımsız WebSocket istemcisiyle kontroller, oda kapasitesi, heartbeat, reconnect, theater/fullscreen mesajları ve invalid/flood mesajlarını sınar. 5 Kasım 2026: iki test geçti. Public deployment, gerçek tarayıcı ve farklı ülke testi henüz yapılmadı. Eklentinin önceki README'sindeki player/iframe/fullscreen sınırları geçerlidir.
 
-Geniş HTTP/HTTPS site izni, farklı siteler ve iframe'lerde video bulabilmek içindir. Browser'ın site erişimi ayarı enjeksiyonu engellerse izin verip sayfayı yenileyin. Mağaza yayını gerekmez.
-
-## 3. Birlikte kullanım
-
-- A ve B aynı içeriği kendileri açar; gerekiyorsa kendi hesaplarıyla giriş yapar. İlk kullanımdan önce videoyu bir kez oynatıp durdurmak autoplay engelini azaltır.
-- A: eklentiyi açın, WSS adresini girin, **Create Room → Copy Code**.
-- B: aynı WSS adresini girin, kodu yapıştırın, **Join Room**.
-- **Connected · 2/2** görünce izlemeye başlayın. İki kullanıcı da play/pause/seek/rate kontrolüne sahiptir. Kod bir davet sırrıdır; yalnız izleme arkadaşınızla paylaşın.
-- **Leave Room** yalnız bulunduğunuz sekmeyi odadan çıkarır. Popup kapanınca bağlantı devam eder. Video sekmesi yenilenince mevcut odaya bağlanır; tarayıcı tamamen kapatılırsa yeniden katılın.
-
-## Görünüm
-
-**Theater Mode:** videoyu bulunduğu frame'in viewport'una büyütür, oranını korur; diğer kullanıcıya otomatik uygulanır. Esc veya Exit Theater ile özgün inline stiller ve scroll konumu geri yüklenir. Video DOM'da taşınmaz. Iframe içindeki video, iframe sınırının dışına büyüyemez; mümkünse player sayfasını doğrudan açın.
-
-**Real Fullscreen:** popup düğmesi, video sayfasında tıklanacak ikinci bir düğme gösterir. Fullscreen API o yerel tıklamadan çağrılır. Diğer kullanıcı fullscreen'e girerse “Other viewer entered fullscreen — click to match” görünür. Remote fullscreen zorlanmaz. Iframe'in fullscreen policy'si izin vermiyorsa Theater kullanın.
-
-## Destek / sınırlar
-
-- Normal HTML5 video, HTML5 video kullanan custom player, açık shadow DOM ve script enjeksiyonuna izin verilen iframe'ler (cross-origin dahil).
-- Görünür videolar arasında alan ve oynama durumuna göre seçim; küçük thumbnail yerine büyük video tercih edilir. İki benzer boyutta aktif player varsa yanlış seçim olabilir.
-- Erişilemeyen iframe bulunan ve kontrol edilebilir video bulunamayan sayfada **Player detected but not controllable** gösterilir. Bu iframe sezgisidir; kapalı frame'in gerçekten video içerdiği doğrulanamaz.
-- DRM/paywall/abonelik/ülke engeli aşılmaz. YouTube gibi özel siteler için adapter yok. Canvas player, kapalı shadow root, reklam geçişleri ve ağır site CSS'i garanti edilmez.
-- Canlı yayın/DVR yerine süreli film/dizi hedeflenir. İçeriğin aynı olması gerekir; farklı reklam/kurgular senkronu bozar. Buffering ve autoplay engeli gecikmeye yol açabilir.
-- Heartbeat yaklaşık 4 saniyede bir: ≤0.25 sn fark yok sayılır; 0.25–1.5 sn fark kısa ±%5 rate düzeltmesiyle, >1.5 sn fark seek ile düzeltilir. Host heartbeat saati olur; her iki kullanıcı bilinçli kontroller gönderebilir. Frame düzeyinde eşleşme vaat edilmez.
-
-## Güvenlik ve geliştirme
-
-144 bit rastgele oda kodu; oda başına iki bağlantı; 30 dakika hareketsizlikte silme; sıkı mesaj/alan doğrulaması; 2 KB payload; bağlantı ve mesaj hızı sınırı. Room code ve oynatma durumu bellektedir; uygulama bunları loglamaz. Hesap, cookie, medya proxy'si, uzaktan kod çalıştırma veya eval yok. WSS zorunlu; yalnız localhost testinde WS kabul edilir.
-
-Backend: Node 22+, `cd backend && npm ci && npm start` (port 3000). Yerel test adresi `ws://localhost:3000`; bu adres farklı bilgisayarlarda internet kullanımının yerine geçmez. Production tek instance olmalıdır; odalar bellekte tutulur.
-
-Test: backend'de `npm ci`, proje kökünde `node --test test/*.test.js`. `TEST_RESULTS.md` kapsamı açıklar. `playerAdapter` arayüzü `extension/content.js` içindedir; sonraki site adaptörleri buraya eklenebilir.
+Resmî kaynaklar:
+- https://www.cloudflare.com/products/workers/ (no credit card required)
+- https://developers.cloudflare.com/changelog/post/2025-04-07-durable-objects-free-tier/
+- https://developers.cloudflare.com/workers/ci-cd/builds/configuration/
