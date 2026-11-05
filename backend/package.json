@@ -1,0 +1,16 @@
+{
+  "name": "watch-together-relay",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test ../test/*.test.js"
+  },
+  "dependencies": {
+    "ws": "8.22.1"
+  }
+}

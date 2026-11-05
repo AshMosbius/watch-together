@@ -1,0 +1,6 @@
+const $=id=>document.getElementById(id);let tabId;
+async function call(type,extra={}){return chrome.runtime.sendMessage({type,tabId,...extra});}
+async function refresh(){const s=await call('status');$('status').textContent=`${s.status} · ${s.count}/2`;$('role').textContent=s.role;$('player').textContent=s.player;if(s.code&&document.activeElement!==$('code'))$('code').value=s.code;$('theater').textContent=s.theater?'Exit Theater':'Theater Mode';if(s.error)$('error').textContent=s.error;}
+(async()=>{const[tab]=await chrome.tabs.query({active:true,currentWindow:true});tabId=tab.id;const{endpoint=DEFAULT_ENDPOINT}=await chrome.storage.local.get('endpoint');$('endpoint').value=endpoint;await refresh();setInterval(refresh,1000);})();
+for(const type of ['create','join','leave','theater','fullscreen'])$(type).onclick=async()=>{try{$('error').textContent='';const endpoint=$('endpoint').value.trim();if(type==='create'||type==='join')await chrome.storage.local.set({endpoint});const r=await call(type,{endpoint,code:$('code').value.trim()});if(r?.error)$('error').textContent=r.error;await refresh();}catch(e){$('error').textContent=e.message;}};
+$('copy').onclick=()=>navigator.clipboard.writeText($('code').value).catch(e=>$('error').textContent=e.message);

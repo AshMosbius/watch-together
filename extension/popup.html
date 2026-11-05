@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Watch Together</title><link rel="stylesheet" href="popup.css"><body>
+<h3>Watch Together</h3>
+<label>Relay WSS endpoint<input id="endpoint" placeholder="wss://your-service.onrender.com"></label>
+<div class="row"><button id="create">Create Room</button><button id="join">Join Room</button></div>
+<label>Room Code<input id="code" autocomplete="off" spellcheck="false" placeholder="Paste room code"></label><button id="copy">Copy Code</button>
+<p id="status">Disconnected</p><p id="role">—</p><p id="player">Detecting player…</p>
+<div class="row"><button id="theater">Theater Mode</button><button id="fullscreen">Real Fullscreen</button></div>
+<button id="leave">Leave Room</button><p id="error" role="alert"></p>
+<small>Open the same video on both computers. Fullscreen needs a second click inside the page.</small><script src="config.js"></script><script src="popup.js"></script></body></html>
